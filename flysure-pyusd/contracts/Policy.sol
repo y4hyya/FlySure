@@ -2,12 +2,17 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title Policy
  * @dev Flight insurance policy contract for FlySure
+ * Uses PYUSD (PayPal USD) stablecoin for premium payments and payouts
  */
 contract Policy is Ownable {
+    
+    // PYUSD token interface
+    IERC20 public pyusdToken;
     
     // Enum to represent the status of a policy
     enum PolicyStatus {
@@ -36,7 +41,29 @@ contract Policy is Ownable {
     // Oracle address for flight data verification
     address public oracleAddress;
     
-    constructor() Ownable(msg.sender) {
+    // Events
+    event PolicyCreated(
+        uint256 indexed policyId,
+        address indexed holder,
+        string flightId,
+        uint256 premium,
+        uint256 payout
+    );
+    
+    event PolicyPaidOut(
+        uint256 indexed policyId,
+        address indexed holder,
+        uint256 payoutAmount
+    );
+    
+    /**
+     * @dev Constructor to initialize the contract with PYUSD token address
+     * @param _pyusdTokenAddress Address of PYUSD token on Sepolia testnet
+     * For Sepolia: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9
+     */
+    constructor(address _pyusdTokenAddress) Ownable(msg.sender) {
+        require(_pyusdTokenAddress != address(0), "Invalid PYUSD token address");
+        pyusdToken = IERC20(_pyusdTokenAddress);
         _policyIdCounter = 0;
     }
     
