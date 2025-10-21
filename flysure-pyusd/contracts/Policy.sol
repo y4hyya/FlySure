@@ -75,5 +75,63 @@ contract Policy is Ownable {
         require(_oracleAddress != address(0), "Invalid oracle address");
         oracleAddress = _oracleAddress;
     }
+    
+    /**
+     * @dev Create a new insurance policy
+     * @param _flightId Flight identifier (e.g., "IST-BER-20251025")
+     * @param _premiumAmount Amount of PYUSD to pay as premium
+     * @param _payoutAmount Amount of PYUSD to receive if claim is valid
+     * @param _delayThreshold Delay threshold in minutes (e.g., 120)
+     * @return policyId The ID of the newly created policy
+     * 
+     * Requirements:
+     * - User must have approved this contract to spend at least _premiumAmount PYUSD
+     * - _premiumAmount must be greater than 0
+     * - _payoutAmount must be greater than 0
+     * - _delayThreshold must be greater than 0
+     */
+    function createPolicy(
+        string memory _flightId,
+        uint256 _premiumAmount,
+        uint256 _payoutAmount,
+        uint256 _delayThreshold
+    ) public returns (uint256) {
+        // Validation checks
+        require(_premiumAmount > 0, "Premium amount must be greater than 0");
+        require(_payoutAmount > 0, "Payout amount must be greater than 0");
+        require(_delayThreshold > 0, "Delay threshold must be greater than 0");
+        require(bytes(_flightId).length > 0, "Flight ID cannot be empty");
+        
+        // Transfer premium from user to this contract
+        // Note: User must have called pyusdToken.approve(thisContract, _premiumAmount) first
+        bool success = pyusdToken.transferFrom(msg.sender, address(this), _premiumAmount);
+        require(success, "PYUSD transfer failed");
+        
+        // Increment policy counter and get new policy ID
+        _policyIdCounter++;
+        uint256 newPolicyId = _policyIdCounter;
+        
+        // Create new policy in storage
+        policies[newPolicyId] = PolicyInfo({
+            policyId: newPolicyId,
+            policyHolder: msg.sender,
+            flightId: _flightId,
+            premiumAmount: _premiumAmount,
+            payoutAmount: _payoutAmount,
+            delayThreshold: _delayThreshold,
+            status: PolicyStatus.ACTIVE
+        });
+        
+        // Emit event
+        emit PolicyCreated(
+            newPolicyId,
+            msg.sender,
+            _flightId,
+            _premiumAmount,
+            _payoutAmount
+        );
+        
+        return newPolicyId;
+    }
 }
 
