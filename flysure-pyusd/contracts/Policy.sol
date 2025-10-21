@@ -1,127 +1,52 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title Policy
  * @dev Flight insurance policy contract for FlySure
  */
-contract Policy is Ownable, ReentrancyGuard {
+contract Policy is Ownable {
     
-    struct InsurancePolicy {
-        address policyholder;
-        string flightNumber;
-        uint256 departureTime;
-        uint256 coverageAmount;
-        uint256 premium;
-        bool isActive;
-        bool isClaimed;
+    // Enum to represent the status of a policy
+    enum PolicyStatus {
+        ACTIVE,
+        PAID,
+        EXPIRED
     }
     
-    mapping(uint256 => InsurancePolicy) public policies;
-    uint256 public nextPolicyId;
+    // Struct to represent a policy
+    struct PolicyInfo {
+        uint256 policyId;
+        address policyHolder;
+        string flightId;              // e.g., "IST-BER-20251025"
+        uint256 premiumAmount;        // Amount of PYUSD paid
+        uint256 payoutAmount;         // Amount of PYUSD to be paid on delay
+        uint256 delayThreshold;       // Delay threshold in minutes (e.g., 120)
+        PolicyStatus status;
+    }
     
-    event PolicyCreated(
-        uint256 indexed policyId,
-        address indexed policyholder,
-        string flightNumber,
-        uint256 departureTime,
-        uint256 coverageAmount,
-        uint256 premium
-    );
+    // Mapping to store policies by ID
+    mapping(uint256 => PolicyInfo) public policies;
     
-    event PolicyClaimed(
-        uint256 indexed policyId,
-        address indexed policyholder,
-        uint256 payoutAmount
-    );
+    // Counter for policy IDs
+    uint256 private _policyIdCounter;
+    
+    // Oracle address for flight data verification
+    address public oracleAddress;
     
     constructor() Ownable(msg.sender) {
-        nextPolicyId = 1;
+        _policyIdCounter = 0;
     }
     
     /**
-     * @dev Create a new insurance policy
-     * @param _flightNumber Flight number
-     * @param _departureTime Scheduled departure time
-     * @param _coverageAmount Amount of coverage
+     * @dev Set the oracle address
+     * @param _oracleAddress Address of the oracle
      */
-    function createPolicy(
-        string memory _flightNumber,
-        uint256 _departureTime,
-        uint256 _coverageAmount
-    ) external payable returns (uint256) {
-        require(msg.value > 0, "Premium must be greater than 0");
-        require(_departureTime > block.timestamp, "Departure time must be in the future");
-        
-        uint256 policyId = nextPolicyId++;
-        
-        policies[policyId] = InsurancePolicy({
-            policyholder: msg.sender,
-            flightNumber: _flightNumber,
-            departureTime: _departureTime,
-            coverageAmount: _coverageAmount,
-            premium: msg.value,
-            isActive: true,
-            isClaimed: false
-        });
-        
-        emit PolicyCreated(
-            policyId,
-            msg.sender,
-            _flightNumber,
-            _departureTime,
-            _coverageAmount,
-            msg.value
-        );
-        
-        return policyId;
+    function setOracleAddress(address _oracleAddress) external onlyOwner {
+        require(_oracleAddress != address(0), "Invalid oracle address");
+        oracleAddress = _oracleAddress;
     }
-    
-    /**
-     * @dev Claim a policy payout
-     * @param _policyId Policy ID to claim
-     */
-    function claimPolicy(uint256 _policyId) external nonReentrant {
-        InsurancePolicy storage policy = policies[_policyId];
-        
-        require(policy.policyholder == msg.sender, "Not the policyholder");
-        require(policy.isActive, "Policy is not active");
-        require(!policy.isClaimed, "Policy already claimed");
-        require(block.timestamp > policy.departureTime, "Flight has not departed yet");
-        
-        policy.isClaimed = true;
-        policy.isActive = false;
-        
-        uint256 payoutAmount = policy.coverageAmount;
-        
-        (bool success, ) = payable(msg.sender).call{value: payoutAmount}("");
-        require(success, "Payout transfer failed");
-        
-        emit PolicyClaimed(_policyId, msg.sender, payoutAmount);
-    }
-    
-    /**
-     * @dev Get policy details
-     * @param _policyId Policy ID
-     */
-    function getPolicy(uint256 _policyId) external view returns (InsurancePolicy memory) {
-        return policies[_policyId];
-    }
-    
-    /**
-     * @dev Owner can withdraw contract balance
-     */
-    function withdraw() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No balance to withdraw");
-        
-        (bool success, ) = payable(owner()).call{value: balance}("");
-        require(success, "Withdrawal failed");
-    }
-    
-    receive() external payable {}
 }
 
