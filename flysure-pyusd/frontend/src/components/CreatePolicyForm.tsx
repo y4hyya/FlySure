@@ -134,7 +134,7 @@ export function CreatePolicyForm() {
             value={flightId}
             onChange={(e) => setFlightId(e.target.value)}
             placeholder="e.g., IST-BER-20251025"
-            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
             disabled={isApproving || isCreating}
           />
           <p className="mt-1 text-sm text-gray-500">
