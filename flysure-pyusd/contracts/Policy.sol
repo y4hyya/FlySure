@@ -180,5 +180,16 @@ contract Policy is Ownable {
             policy.status = PolicyStatus.EXPIRED;
         }
     }
+    
+    /**
+     * @dev Get detailed information about a specific policy
+     * @param _policyId The ID of the policy to retrieve
+     * @return PolicyInfo struct containing all policy details
+     * 
+     * This is a convenience function for frontend to fetch complete policy data
+     */
+    function getPolicyDetails(uint256 _policyId) public view returns (PolicyInfo memory) {
+        return policies[_policyId];
+    }
 }
 
