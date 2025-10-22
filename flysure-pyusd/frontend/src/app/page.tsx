@@ -2,15 +2,26 @@
 
 import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
 import { CreatePolicyForm } from '@/components/CreatePolicyForm';
 import { MyPolicies } from '@/components/MyPolicies';
+import { POLICY_ABI, POLICY_CONTRACT_ADDRESS } from '@/lib/abi';
+import Link from 'next/link';
 
 type View = 'home' | 'create' | 'policies';
 
 export default function Home() {
   const { isConnected, address } = useAccount();
   const [currentView, setCurrentView] = useState<View>('home');
+
+  // Check if user is contract owner
+  const { data: contractOwner } = useReadContract({
+    address: POLICY_CONTRACT_ADDRESS,
+    abi: POLICY_ABI,
+    functionName: 'owner',
+  }) as { data: string | undefined };
+
+  const isOwner = address && contractOwner && address.toLowerCase() === contractOwner.toLowerCase();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -24,7 +35,18 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-indigo-600">✈️ FlySure</h1>
               <span className="ml-2 text-sm text-gray-500">PYUSD Insurance</span>
             </button>
-            <ConnectButton />
+            <div className="flex items-center gap-4">
+              {isConnected && isOwner && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+                >
+                  <span>👨‍💼</span>
+                  <span>Admin Panel</span>
+                </Link>
+              )}
+              <ConnectButton />
+            </div>
           </div>
         </div>
       </nav>
