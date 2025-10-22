@@ -11,6 +11,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 contract Policy is Ownable {
     
+    // Custom errors
+    error NotOracle();
+    
     // PYUSD token interface
     IERC20 public pyusdToken;
     
@@ -77,6 +80,14 @@ contract Policy is Ownable {
     }
     
     /**
+     * @dev Modifier to restrict function access to oracle only
+     */
+    modifier onlyOracle() {
+        if (msg.sender != oracleAddress) revert NotOracle();
+        _;
+    }
+    
+    /**
      * @dev Create a new insurance policy
      * @param _flightId Flight identifier (e.g., "IST-BER-20251025")
      * @param _premiumAmount Amount of PYUSD to pay as premium
@@ -132,6 +143,42 @@ contract Policy is Ownable {
         );
         
         return newPolicyId;
+    }
+    
+    /**
+     * @dev Trigger a policy payout based on actual flight delay
+     * @param _policyId The ID of the policy to process
+     * @param _actualDelayInMinutes The actual flight delay in minutes
+     * 
+     * Requirements:
+     * - Can only be called by the oracle address
+     * - Policy must exist and be ACTIVE
+     * - If delay >= threshold: pays out and sets status to PAID
+     * - If delay < threshold: sets status to EXPIRED (no payout)
+     */
+    function triggerPayout(uint256 _policyId, uint256 _actualDelayInMinutes) public onlyOracle {
+        // Get policy from storage
+        PolicyInfo storage policy = policies[_policyId];
+        
+        // Validation checks
+        require(policy.policyHolder != address(0), "Policy not found");
+        require(policy.status == PolicyStatus.ACTIVE, "Policy not active");
+        
+        // Check if delay meets or exceeds threshold
+        if (_actualDelayInMinutes >= policy.delayThreshold) {
+            // Delay threshold met - process payout
+            policy.status = PolicyStatus.PAID;
+            
+            // Transfer payout amount from contract to policy holder
+            bool success = pyusdToken.transfer(policy.policyHolder, policy.payoutAmount);
+            require(success, "PYUSD payout transfer failed");
+            
+            // Emit payout event
+            emit PolicyPaidOut(_policyId, policy.policyHolder, policy.payoutAmount);
+        } else {
+            // Delay threshold not met - expire policy without payout
+            policy.status = PolicyStatus.EXPIRED;
+        }
     }
 }
 
