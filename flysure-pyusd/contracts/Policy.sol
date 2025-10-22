@@ -41,6 +41,9 @@ contract Policy is Ownable {
     // Counter for policy IDs
     uint256 private _policyIdCounter;
     
+    // Mapping to track user's policy IDs
+    mapping(address => uint256[]) private userPolicies;
+    
     // Oracle address for flight data verification
     address public oracleAddress;
     
@@ -133,6 +136,9 @@ contract Policy is Ownable {
             status: PolicyStatus.ACTIVE
         });
         
+        // Track policy ID for user
+        userPolicies[msg.sender].push(newPolicyId);
+        
         // Emit event
         emit PolicyCreated(
             newPolicyId,
@@ -190,6 +196,17 @@ contract Policy is Ownable {
      */
     function getPolicyDetails(uint256 _policyId) public view returns (PolicyInfo memory) {
         return policies[_policyId];
+    }
+    
+    /**
+     * @dev Get all policy IDs for a specific user
+     * @param _user Address of the user
+     * @return Array of policy IDs owned by the user
+     * 
+     * Use this to retrieve a user's policy IDs, then call getPolicyDetails for each
+     */
+    function getPolicyIdsForUser(address _user) public view returns (uint256[] memory) {
+        return userPolicies[_user];
     }
 }
 

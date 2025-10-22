@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
 import { CreatePolicyForm } from '@/components/CreatePolicyForm';
+import { MyPolicies } from '@/components/MyPolicies';
 
 type View = 'home' | 'create' | 'policies';
 
@@ -140,15 +141,7 @@ export default function Home() {
               </svg>
               Back to Home
             </button>
-            <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">📋 My Policies</h2>
-              <p className="text-gray-600 mb-6">
-                View your insurance policies here (Coming soon...)
-              </p>
-              <div className="text-sm text-gray-500">
-                This feature will display all your active, paid, and expired policies.
-              </div>
-            </div>
+            <MyPolicies />
           </div>
         )}
 
