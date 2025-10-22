@@ -69,6 +69,7 @@ FRONTEND_SETUP_COMPLETE.md
 PROJECT_INFO 2.md
 SETUP_SUMMARY 2.md
 README 2.md
+frontend/USING_THE_UI.md
 
 # Package manager files
 package-lock.json.bak
