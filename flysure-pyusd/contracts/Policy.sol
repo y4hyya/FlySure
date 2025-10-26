@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./PolicyNFT.sol";
 
 /**
  * @title Policy
@@ -16,6 +17,9 @@ contract Policy is Ownable {
     
     // PYUSD token interface
     IERC20 public pyusdToken;
+    
+    // PolicyNFT contract instance
+    PolicyNFT public policyNFTContract;
     
     // Enum to represent the status of a policy
     enum PolicyStatus {
@@ -57,6 +61,12 @@ contract Policy is Ownable {
     // Mapping to track which address has insured which flight (prevents double-booking)
     mapping(address => mapping(string => bool)) public hasInsuredFlight;
     
+    // Mapping to track if a flight ID already has a policy (prevents multiple policies for same flight)
+    mapping(string => bool) public flightHasPolicy;
+    
+    // Mapping to track policy IDs for each flight (for oracle to find)
+    mapping(string => uint256[]) public flightToPolicyIds;
+    
     // Oracle address for flight data verification
     address public oracleAddress;
     
@@ -82,14 +92,22 @@ contract Policy is Ownable {
         uint256 actualDelayMinutes
     );
     
+    event ClaimPaid(
+        uint256 indexed policyId,
+        address indexed claimant,
+        uint256 payoutAmount
+    );
+    
     /**
      * @dev Constructor to initialize the contract with PYUSD token address
      * @param _pyusdTokenAddress Address of PYUSD token on Sepolia testnet
      * For Sepolia: 0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9
      */
-    constructor(address _pyusdTokenAddress) Ownable(msg.sender) {
+    constructor(address _pyusdTokenAddress, address _policyNFTAddress) Ownable(msg.sender) {
         require(_pyusdTokenAddress != address(0), "Invalid PYUSD token address");
+        require(_policyNFTAddress != address(0), "Invalid PolicyNFT contract address");
         pyusdToken = IERC20(_pyusdTokenAddress);
+        policyNFTContract = PolicyNFT(_policyNFTAddress);
         _policyIdCounter = 0;
     }
     
@@ -128,66 +146,81 @@ contract Policy is Ownable {
      * - Oracle address must be set
      * - Contract must have sufficient PYUSD for payout
      */
+    /**
+     * @dev Create a new insurance policy and mint an NFT
+     * @param _flightNumber The flight number
+     * @param _departureTimestamp The departure timestamp
+     * @param _payoutAmount The payout amount
+     * @return newPolicyId The ID of the created policy
+     */
     function createPolicy(
-        string memory _flightId,
-        uint256 _premiumAmount,
-        uint256 _payoutAmount,
-        uint256 _delayThreshold,
-        uint256 _departureTimestamp
+        string memory _flightNumber,
+        uint256 _departureTimestamp,
+        uint256 _payoutAmount
     ) public returns (uint256) {
+        // Calculate premium (10% of payout amount)
+        uint256 calculatedPremium = _payoutAmount / 10;
+        
         // Validation checks
-        require(_premiumAmount > 0, "Premium amount must be greater than 0");
         require(_payoutAmount > 0, "Payout amount must be greater than 0");
-        require(_delayThreshold > 0, "Delay threshold must be greater than 0");
-        require(bytes(_flightId).length > 0, "Flight ID cannot be empty");
+        require(bytes(_flightNumber).length > 0, "Flight number cannot be empty");
         require(_departureTimestamp > block.timestamp, "Departure must be in the future");
         require(oracleAddress != address(0), "Oracle address not set");
-        require(_payoutAmount <= _premiumAmount * 10, "Payout cannot exceed 10x premium");
         
         // Prevent double-booking: check if user has already insured this flight
         require(
-            hasInsuredFlight[msg.sender][_flightId] == false,
+            hasInsuredFlight[msg.sender][_flightNumber] == false,
             "FlySure: You have already insured this flight"
+        );
+        
+        // Prevent multiple policies for the same flight ID
+        require(
+            flightHasPolicy[_flightNumber] == false,
+            "FlySure: This flight already has a policy"
         );
         
         // Check if contract has sufficient PYUSD for payout
         require(pyusdToken.balanceOf(address(this)) >= _payoutAmount, "Insufficient contract balance for payout");
         
         // Transfer premium from user to this contract
-        // Note: User must have called pyusdToken.approve(thisContract, _premiumAmount) first
-        bool success = pyusdToken.transferFrom(msg.sender, address(this), _premiumAmount);
+        // Note: User must have called pyusdToken.approve(thisContract, calculatedPremium) first
+        bool success = pyusdToken.transferFrom(msg.sender, address(this), calculatedPremium);
         require(success, "PYUSD transfer failed");
         
-        // Increment policy counter and get new policy ID
-        _policyIdCounter++;
+        // Get the new policy ID
         uint256 newPolicyId = _policyIdCounter;
         
-        // Create new policy in storage
-        policies[newPolicyId] = PolicyInfo({
-            policyId: newPolicyId,
-            policyHolder: msg.sender,
-            flightId: _flightId,
-            premiumAmount: _premiumAmount,
-            payoutAmount: _payoutAmount,
-            delayThreshold: _delayThreshold,
-            departureTimestamp: _departureTimestamp,
-            flightStatus: FlightStatus.ON_TIME, // Initialize as on time
-            actualDelayMinutes: 0, // Initialize as no delay
-            status: PolicyStatus.ACTIVE
-        });
+        // Call the NFT Contract to mint policy NFT
+        policyNFTContract.mintPolicy(
+            msg.sender,
+            _flightNumber,
+            calculatedPremium, // premium
+            _payoutAmount,
+            _departureTimestamp,
+            newPolicyId
+        );
+        
+        // Update local mappings for oracle to find later
+        flightToPolicyIds[_flightNumber].push(newPolicyId);
+        
+        // Mark this flight as insured by this user (prevent double-booking)
+        hasInsuredFlight[msg.sender][_flightNumber] = true;
+        
+        // Mark this flight as having a policy (prevent multiple policies for same flight)
+        flightHasPolicy[_flightNumber] = true;
         
         // Track policy ID for user
         userPolicies[msg.sender].push(newPolicyId);
         
-        // Mark this flight as insured by this user (prevent double-booking)
-        hasInsuredFlight[msg.sender][_flightId] = true;
+        // Increment the ID counter
+        _policyIdCounter++;
         
         // Emit event
         emit PolicyCreated(
             newPolicyId,
             msg.sender,
-            _flightId,
-            _premiumAmount,
+            _flightNumber,
+            calculatedPremium,
             _payoutAmount
         );
         
@@ -243,58 +276,33 @@ contract Policy is Ownable {
      * This is the main user-facing claim function that processes payouts
      * based on parametric conditions set by the oracle
      */
-    function claimPayout(uint256 _policyId) public {
-        // Get policy from storage
-        PolicyInfo storage policy = policies[_policyId];
+    /**
+     * @dev Process a claim for a policy NFT
+     * @param _policyId The policy ID to claim
+     */
+    function processClaim(uint256 _policyId) public {
+        // Check ownership: verify that msg.sender actually owns this policy NFT
+        require(policyNFTContract.ownerOf(_policyId) == msg.sender, "FlySure: Not your policy");
         
-        // Validation checks
-        require(policy.policyHolder != address(0), "Policy not found");
-        require(msg.sender == policy.policyHolder, "Only policy holder can claim");
-        require(policy.status == PolicyStatus.ACTIVE, "Policy not active");
+        // Check status: verify the NFT's status is 'Claimable' (which the oracle set)
+        PolicyNFT.PolicyStatus currentStatus = policyNFTContract.getPolicyStatus(_policyId);
+        require(currentStatus == PolicyNFT.PolicyStatus.Claimable, "FlySure: Policy is not claimable");
         
-        // Check if departure time has passed (policy can only be claimed after departure)
-        require(block.timestamp >= policy.departureTimestamp, "Cannot claim before departure time");
+        // Get payout amount from NFT contract
+        (string memory flightNumber, uint256 premiumAmount, uint256 payoutAmount, uint256 departureTimestamp, PolicyNFT.PolicyStatus status) = policyNFTContract.policyDetails(_policyId);
+        uint256 payout = payoutAmount;
+        require(payout > 0, "Payout invalid");
         
-        // Check oracle-provided flight status and process accordingly
-        if (policy.flightStatus == FlightStatus.CANCELLED) {
-            // Flight cancelled - full payout regardless of delay threshold
-            // CHECKS-EFFECTS-INTERACTIONS PATTERN
-            // 1. CHECKS: All validation above
-            
-            // 2. EFFECTS: Update state before external calls
-            policy.status = PolicyStatus.PAID;
-            
-            // 3. INTERACTIONS: External call (transfer tokens)
-            bool success = pyusdToken.transfer(policy.policyHolder, policy.payoutAmount);
-            require(success, "PYUSD payout transfer failed");
-            
-            // Emit payout event
-            emit PolicyPaidOut(_policyId, policy.policyHolder, policy.payoutAmount);
-            
-        } else if (policy.flightStatus == FlightStatus.DELAYED) {
-            // For delayed flights, we need to check if delay meets threshold
-            // Note: This requires the actual delay to be passed as a parameter
-            // For now, we'll assume if status is DELAYED, it qualifies for payout
-            // In a real implementation, you might want to store the actual delay
-            // or require it as a parameter
-            
-            // CHECKS-EFFECTS-INTERACTIONS PATTERN
-            // 1. CHECKS: All validation above
-            
-            // 2. EFFECTS: Update state before external calls
-            policy.status = PolicyStatus.PAID;
-            
-            // 3. INTERACTIONS: External call (transfer tokens)
-            bool success = pyusdToken.transfer(policy.policyHolder, policy.payoutAmount);
-            require(success, "PYUSD payout transfer failed");
-            
-            // Emit payout event
-            emit PolicyPaidOut(_policyId, policy.policyHolder, policy.payoutAmount);
-            
-        } else {
-            // FlightStatus.ON_TIME - not eligible for payout
-            revert("Flight status does not qualify for payout");
-        }
+        // CHECKS-EFFECTS-INTERACTIONS PATTERN
+        // EFFECT: First, burn the NFT to prevent re-entrancy/double claims
+        policyNFTContract.burnPolicy(_policyId);
+        
+        // INTERACTION: Transfer the funds
+        bool success = pyusdToken.transfer(msg.sender, payout);
+        require(success, "Failed to send payment");
+        
+        // Emit event
+        emit ClaimPaid(_policyId, msg.sender, payout);
     }
     
     /**
@@ -337,37 +345,70 @@ contract Policy is Ownable {
      * - Automatically processes payout if delay >= threshold
      * - This is the main parametric trigger function
      */
-    function updateFlightStatus(
-        uint256 _policyId,
-        FlightStatus _flightStatus,
-        uint256 _actualDelayMinutes
-    ) public onlyOracle {
-        // Get policy from storage
-        PolicyInfo storage policy = policies[_policyId];
+    /**
+     * @dev Update flight status for all policies of a specific flight (called by oracle)
+     * @param _flightNumber The flight number to update
+     * @param _newStatus The new policy status (0=Active, 1=Claimable, 2=PaidOut, 3=Expired)
+     */
+    function updateFlightStatus(string memory _flightNumber, uint8 _newStatus) public {
+        // Oracle security check
+        require(msg.sender == oracleAddress, "Not the oracle");
         
-        // Validation checks
-        require(policy.policyHolder != address(0), "Policy not found");
-        require(policy.status == PolicyStatus.ACTIVE, "Policy not active");
+        // Get the array of policy IDs for the flight
+        uint256[] memory policyIds = flightToPolicyIds[_flightNumber];
         
-        // Update flight status
-        policy.flightStatus = _flightStatus;
+        // Loop and update each policy NFT
+        for (uint i = 0; i < policyIds.length; i++) {
+            uint256 policyId = policyIds[i];
+            
+            // Check current status to avoid redundant updates
+            PolicyNFT.PolicyStatus currentStatus = policyNFTContract.getPolicyStatus(policyId);
+            
+            // Only update if Active (e.g., don't update a PaidOut policy)
+            if (currentStatus == PolicyNFT.PolicyStatus.Active) {
+                policyNFTContract.updatePolicyStatus(policyId, PolicyNFT.PolicyStatus(_newStatus));
+            }
+        }
         
-        // Emit status update event
-        emit FlightStatusUpdated(_policyId, policy.flightId, _flightStatus, _actualDelayMinutes);
-        
-        // Note: Oracle only updates flight status. User must call claimPayout() or expirePolicy()
-        // to process the policy based on the updated flight status.
+        // Emit event for the flight status update
+        emit FlightStatusUpdated(0, _flightNumber, FlightStatus(_newStatus), 0);
     }
     
     /**
-     * @dev Get detailed information about a specific policy
+     * @dev Get detailed information about a specific policy NFT
      * @param _policyId The ID of the policy to retrieve
      * @return PolicyInfo struct containing all policy details
      * 
      * This is a convenience function for frontend to fetch complete policy data
      */
     function getPolicyDetails(uint256 _policyId) public view returns (PolicyInfo memory) {
-        return policies[_policyId];
+        // Get data from NFT contract
+        (string memory flightNumber, uint256 premiumAmount, uint256 payoutAmount, uint256 departureTimestamp, PolicyNFT.PolicyStatus status) = policyNFTContract.policyDetails(_policyId);
+        
+        // Convert NFT status to PolicyInfo status
+        uint8 policyStatus;
+        if (status == PolicyNFT.PolicyStatus.Active) {
+            policyStatus = 0; // ACTIVE
+        } else if (status == PolicyNFT.PolicyStatus.Claimable) {
+            policyStatus = 0; // Still ACTIVE for frontend purposes
+        } else if (status == PolicyNFT.PolicyStatus.PaidOut) {
+            policyStatus = 1; // PAID
+        } else if (status == PolicyNFT.PolicyStatus.Expired) {
+            policyStatus = 2; // EXPIRED
+        }
+        
+        return PolicyInfo({
+            policyId: _policyId,
+            policyHolder: policyNFTContract.ownerOf(_policyId),
+            flightId: flightNumber,
+            premiumAmount: premiumAmount,
+            payoutAmount: payoutAmount,
+            delayThreshold: 120, // Default threshold
+            departureTimestamp: departureTimestamp,
+            flightStatus: FlightStatus.ON_TIME, // Default to ON_TIME
+            actualDelayMinutes: 0, // Default
+            status: PolicyStatus(policyStatus)
+        });
     }
     
     /**

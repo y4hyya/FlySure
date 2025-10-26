@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseUnits } from 'viem';
 import { POLICY_ABI, ERC20_ABI, POLICY_CONTRACT_ADDRESS, PYUSD_TOKEN_ADDRESS } from '@/lib/abi';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,10 +40,24 @@ export function CreatePolicyForm() {
   const [txStatus, setTxStatus] = useState<'idle' | 'approving' | 'approved' | 'creating' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  
+  // Flight policy validation
+  const [flightAlreadyExists, setFlightAlreadyExists] = useState(false);
 
   // Wagmi hooks for contract writes
   const { writeContract: writeApprove, data: approveHash, error: approveError } = useWriteContract();
   const { writeContract: writeCreate, data: createHash, error: createError } = useWriteContract();
+  
+  // Check if flight already has a policy
+  const { data: flightHasPolicy, isLoading: isCheckingFlight } = useReadContract({
+    address: POLICY_CONTRACT_ADDRESS,
+    abi: POLICY_ABI,
+    functionName: 'flightHasPolicy',
+    args: flightCode && flightCode.length > 0 ? [flightCode] : undefined,
+    query: {
+      enabled: Boolean(flightCode && flightCode.length > 0),
+    },
+  });
 
   // Wait for approve transaction
   const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
@@ -67,8 +81,30 @@ export function CreatePolicyForm() {
     setPayoutAmount(calculatedPayout);
   }, [premiumAmount, delayThreshold]);
 
+  // Update flight validation state when flightHasPolicy data changes
+  useEffect(() => {
+    if (flightCode && flightCode.length > 0) {
+      if (flightHasPolicy === true) {
+        setFlightAlreadyExists(true);
+        setErrorMessage('This flight already has a policy. Only one policy per flight is allowed.');
+      } else if (flightHasPolicy === false) {
+        setFlightAlreadyExists(false);
+        setErrorMessage('');
+      }
+    } else {
+      setFlightAlreadyExists(false);
+      setErrorMessage('');
+    }
+  }, [flightCode, flightHasPolicy]);
+
   const handleCreatePolicy = async () => {
     try {
+      // Check if flight already has a policy
+      if (flightAlreadyExists) {
+        setErrorMessage('This flight already has a policy. Only one policy per flight is allowed.');
+        return;
+      }
+
       console.log('🚀 Starting policy creation...');
       setTxStatus('creating');
       setIsCreating(true);
@@ -97,10 +133,8 @@ export function CreatePolicyForm() {
         functionName: 'createPolicy',
         args: [
           flightCode,
-          premium,
-          payout,
-          BigInt(delayThreshold),
           BigInt(departureTime),
+          payout,
         ],
         gas: BigInt(500000), // Increased gas limit for Sepolia
       });
@@ -282,6 +316,27 @@ export function CreatePolicyForm() {
                         placeholder="TK1984"
                         className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                       />
+                      {/* Flight validation indicator */}
+                      {flightCode && (
+                        <div className="mt-2 flex items-center gap-2">
+                          {isCheckingFlight ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                              <span className="text-sm text-blue-400">Checking flight availability...</span>
+                            </>
+                          ) : flightAlreadyExists ? (
+                            <>
+                              <AlertCircle className="h-4 w-4 text-red-400" />
+                              <span className="text-sm text-red-400">This flight already has a policy</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 text-green-400" />
+                              <span className="text-sm text-green-400">Flight available for policy</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label htmlFor="departureAirport" className="block text-sm font-medium text-white mb-2">
@@ -536,7 +591,7 @@ export function CreatePolicyForm() {
               {step === 1 && (
                 <Button
                   onClick={() => setStep(2)}
-                  disabled={!flightCode.trim()}
+                  disabled={!flightCode.trim() || flightAlreadyExists || isCheckingFlight}
                   className="ml-auto bg-blue-600 hover:bg-blue-700"
                 >
                   Next
@@ -557,9 +612,9 @@ export function CreatePolicyForm() {
               {step === 3 && (
                 <Button
                   onClick={handleBuyPolicy}
-                  disabled={isApproving || isCreating}
+                  disabled={isApproving || isCreating || flightAlreadyExists}
                   className={`ml-auto ${
-                    isApproving || isCreating
+                    isApproving || isCreating || flightAlreadyExists
                       ? 'bg-gray-600 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700'
                   }`}

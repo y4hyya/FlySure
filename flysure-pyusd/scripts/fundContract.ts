@@ -1,36 +1,46 @@
 import hre from "hardhat";
 
 async function main() {
-  // Configuration
-  const POLICY_CONTRACT_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-  const PYUSD_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Mock PYUSD
+  const policyAddress = "0x85B4d392E4212a4597dF83A3bD8E23e723c38778";
+  const pyusdAddress = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+  const fundAmount = hre.ethers.parseUnits("30", 6); // 30 PYUSD
   
-  // Get signer
-  const [signer] = await hre.ethers.getSigners();
-  console.log("Using account:", signer.address);
+  console.log("💰 Funding Policy Contract...");
+  console.log("Policy Contract:", policyAddress);
+  console.log("Fund Amount:", hre.ethers.formatUnits(fundAmount, 6), "PYUSD");
   
-  // Get contract instances
-  const pyusdToken = await hre.ethers.getContractAt("MockPYUSD", PYUSD_ADDRESS);
-  
-  // Transfer PYUSD to contract for payouts
-  const transferAmount = hre.ethers.parseUnits("1000", 6); // 1000 PYUSD
-  
-  console.log("\n💰 Transferring PYUSD to contract...");
-  console.log("   Amount:", hre.ethers.formatUnits(transferAmount, 6), "PYUSD");
-  console.log("   To:", POLICY_CONTRACT_ADDRESS);
-  
-  const tx = await pyusdToken.transfer(POLICY_CONTRACT_ADDRESS, transferAmount);
-  await tx.wait();
-  
-  console.log("   ✅ Transfer successful! Tx:", tx.hash);
-  
-  // Check balances
-  const contractBalance = await pyusdToken.balanceOf(POLICY_CONTRACT_ADDRESS);
-  const signerBalance = await pyusdToken.balanceOf(signer.address);
-  
-  console.log("\n📊 Updated Balances:");
-  console.log("   Contract Balance:", hre.ethers.formatUnits(contractBalance, 6), "PYUSD");
-  console.log("   Signer Balance:", hre.ethers.formatUnits(signerBalance, 6), "PYUSD");
+  try {
+    // Get deployer
+    const [deployer] = await hre.ethers.getSigners();
+    console.log("Deployer:", deployer.address);
+    
+    // Get PYUSD contract
+    const PYUSD = await hre.ethers.getContractFactory("MockPYUSD");
+    const pyusd = PYUSD.attach(pyusdAddress);
+    
+    // Check deployer balance
+    const deployerBalance = await pyusd.balanceOf(deployer.address);
+    console.log("Deployer Balance:", hre.ethers.formatUnits(deployerBalance, 6), "PYUSD");
+    
+    if (deployerBalance < fundAmount) {
+      console.log("❌ Insufficient PYUSD balance!");
+      return;
+    }
+    
+    // Transfer PYUSD to contract
+    console.log("\n⏳ Transferring PYUSD to contract...");
+    const tx = await pyusd.transfer(policyAddress, fundAmount);
+    await tx.wait();
+    
+    console.log("✅ Transfer successful!");
+    
+    // Verify new balance
+    const newContractBalance = await pyusd.balanceOf(policyAddress);
+    console.log("New Contract Balance:", hre.ethers.formatUnits(newContractBalance, 6), "PYUSD");
+    
+  } catch (error) {
+    console.error("❌ Error:", error.message);
+  }
 }
 
 main()

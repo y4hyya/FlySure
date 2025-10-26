@@ -24,19 +24,33 @@ async function main() {
     return;
   }
 
+  // Deploy PolicyNFT contract first
+  console.log("\n⏳ Deploying PolicyNFT contract...");
+  const PolicyNFT = await hre.ethers.getContractFactory("PolicyNFT");
+  const policyNFT = await PolicyNFT.deploy(deployer.address);
+  await policyNFT.waitForDeployment();
+  const policyNFTAddress = await policyNFT.getAddress();
+  console.log("   PolicyNFT Contract:", policyNFTAddress);
+
   // Deploy Policy contract
   console.log("\n⏳ Deploying Policy contract...");
   const Policy = await hre.ethers.getContractFactory("Policy");
-  const policy = await Policy.deploy(PYUSD_SEPOLIA_ADDRESS);
+  const policy = await Policy.deploy(PYUSD_SEPOLIA_ADDRESS, policyNFTAddress);
 
   await policy.waitForDeployment();
 
   const policyAddress = await policy.getAddress();
   
+  // Transfer PolicyNFT ownership to Policy contract
+  console.log("\n⏳ Transferring PolicyNFT ownership to Policy contract...");
+  await policyNFT.connect(deployer).transferOwnership(policyAddress);
+  console.log("   ✅ Ownership transferred");
+  
   console.log("\n✅ DEPLOYMENT SUCCESSFUL!");
   console.log("=" .repeat(50));
   console.log("\n📍 Contract Addresses:");
   console.log("   Policy Contract:", policyAddress);
+  console.log("   PolicyNFT Contract:", policyNFTAddress);
   console.log("   PYUSD Token:", PYUSD_SEPOLIA_ADDRESS);
   
   // Verify contract configuration
@@ -73,6 +87,7 @@ async function main() {
   const deploymentInfo = {
     network: hre.network.name,
     policyContract: policyAddress,
+    policyNFTContract: policyNFTAddress,
     pyusdToken: PYUSD_SEPOLIA_ADDRESS,
     deployer: deployer.address,
     owner: owner,

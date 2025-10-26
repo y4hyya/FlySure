@@ -194,12 +194,12 @@ function PolicyCard({ policyId }: { policyId: bigint }) {
       await writeClaimPayout({
         address: POLICY_CONTRACT_ADDRESS,
         abi: POLICY_ABI,
-        functionName: 'claimPayout',
+        functionName: 'processClaim',
         args: [policyId],
-        gas: BigInt(300000), // Increased gas limit for claimPayout
+        gas: BigInt(300000), // Increased gas limit for processClaim
       });
     } catch (error) {
-      console.error('Claim payout error:', error);
+      console.error('Process claim error:', error);
     }
   };
 

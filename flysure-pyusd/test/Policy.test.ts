@@ -4,18 +4,24 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Policy", function () {
   async function deployPolicyFixture() {
-    const [owner, policyholder, oracle] = await hre.ethers.getSigners();
+    const [owner, policyholder, oracle, user2] = await hre.ethers.getSigners();
 
     // PYUSD Sepolia testnet address
     const pyusdAddress = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
+    
+    // Deploy PolicyNFT contract
+    const PolicyNFT = await hre.ethers.getContractFactory("PolicyNFT");
+    const policyNFT = await PolicyNFT.deploy(owner.address);
+    await policyNFT.waitForDeployment();
+    const policyNFTAddress = await policyNFT.getAddress();
 
     const Policy = await hre.ethers.getContractFactory("Policy");
-    const policy = await Policy.deploy(pyusdAddress);
+    const policy = await Policy.deploy(pyusdAddress, policyNFTAddress);
 
     // Set oracle address
     await policy.connect(owner).setOracleAddress(oracle.address);
 
-    return { policy, owner, policyholder, oracle };
+    return { policy, policyNFT, owner, policyholder, oracle, user2 };
   }
 
   describe("Deployment", function () {
@@ -178,7 +184,7 @@ describe("Policy", function () {
 
     it("Should fail if non-oracle tries to trigger payout", async function () {
       const { policy, policyholder } = await deployPolicyFixture();
-      
+
       await expect(
         policy.connect(policyholder).triggerPayout(1, 150)
       ).to.be.revertedWithCustomError(policy, "NotOracle");
@@ -187,18 +193,18 @@ describe("Policy", function () {
     it("Should allow oracle to update flight status", async function () {
       const { policy, oracle } = await deployPolicyFixture();
       
-      // Test access control for updateFlightStatus
+      // Test access control for updateFlightStatus (new signature: flightNumber, status)
       await expect(
-        policy.connect(oracle).updateFlightStatus(1, 1, 150) // DELAYED status
-      ).to.be.revertedWith("Policy not found");
+        policy.connect(oracle).updateFlightStatus("FL123", 1) // DELAYED status
+      ).to.not.be.reverted; // Should not revert due to access control
     });
 
     it("Should fail if non-oracle tries to update flight status", async function () {
       const { policy, policyholder } = await deployPolicyFixture();
-      
+
       await expect(
-        policy.connect(policyholder).updateFlightStatus(1, 1, 150)
-      ).to.be.revertedWithCustomError(policy, "NotOracle");
+        policy.connect(policyholder).updateFlightStatus("FL123", 1)
+      ).to.be.revertedWith("Not the oracle");
     });
   });
 
@@ -209,7 +215,7 @@ describe("Policy", function () {
       // This would require a policy to exist and oracle to set flight status
       // For now, we test the access control
       await expect(
-        policy.connect(policyholder).claimPayout(1)
+        policy.connect(policyholder).processClaim(1)
       ).to.be.revertedWith("Policy not found");
     });
 
@@ -220,13 +226,13 @@ describe("Policy", function () {
       const randomAddress = hre.ethers.Wallet.createRandom();
       
       await expect(
-        policy.connect(randomAddress).claimPayout(1)
+        policy.connect(randomAddress).processClaim(1)
       ).to.be.revertedWith("Policy not found");
     });
 
     it("Should allow policyholder to expire policy for on-time flight", async function () {
       const { policy, policyholder } = await deployPolicyFixture();
-      
+
       // This would require a policy to exist with ON_TIME status
       // For now, we test the access control
       await expect(
@@ -236,7 +242,7 @@ describe("Policy", function () {
 
     it("Should fail if non-policyholder tries to expire policy", async function () {
       const { policy, policyholder } = await deployPolicyFixture();
-      
+
       // Create a random address that's not the policyholder
       const randomAddress = hre.ethers.Wallet.createRandom();
       
@@ -278,7 +284,7 @@ describe("Policy", function () {
       
       // Approve PYUSD spending
       await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
-      
+
       // Create policy
       const tx = await testPolicy.connect(policyholder).createPolicy(
         flightId,
@@ -317,7 +323,7 @@ describe("Policy", function () {
       const balanceBefore = await mockPYUSD.balanceOf(policyholder.address);
       
       // Policyholder claims payout
-      const claimTx = await testPolicy.connect(policyholder).claimPayout(policyId);
+      const claimTx = await testPolicy.connect(policyholder).processClaim(policyId);
       await claimTx.wait();
       
       // Get policyholder balance after claim
@@ -363,7 +369,7 @@ describe("Policy", function () {
       
       // Approve PYUSD spending
       await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
-      
+
       // Create policy
       const tx = await testPolicy.connect(policyholder).createPolicy(
         flightId,
@@ -448,7 +454,7 @@ describe("Policy", function () {
       
       // Approve PYUSD spending
       await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
-      
+
       // Create policy
       const tx = await testPolicy.connect(policyholder).createPolicy(
         flightId,
@@ -487,7 +493,7 @@ describe("Policy", function () {
       const balanceBefore = await mockPYUSD.balanceOf(policyholder.address);
       
       // Policyholder claims payout
-      const claimTx = await testPolicy.connect(policyholder).claimPayout(policyId);
+      const claimTx = await testPolicy.connect(policyholder).processClaim(policyId);
       await claimTx.wait();
       
       // Get policyholder balance after claim
@@ -556,7 +562,7 @@ describe("Policy", function () {
       
       const policyId = policyCreatedEvent ? 
         testPolicy.interface.parseLog(policyCreatedEvent)?.args[0] : 1;
-      
+
       // Fast forward time to after departure
       await hre.network.provider.send("evm_increaseTime", [86400 + 1]); // 24 hours + 1 second
       await hre.network.provider.send("evm_mine");
@@ -570,7 +576,7 @@ describe("Policy", function () {
       
       // Policyholder tries to claim payout - should fail
       await expect(
-        testPolicy.connect(policyholder).claimPayout(policyId)
+        testPolicy.connect(policyholder).processClaim(policyId)
       ).to.be.revertedWith("Flight status does not qualify for payout");
       
       // Check policy is still ACTIVE
@@ -642,7 +648,7 @@ describe("Policy", function () {
       
       // Policyholder tries to claim payout before departure - should fail
       await expect(
-        testPolicy.connect(policyholder).claimPayout(policyId)
+        testPolicy.connect(policyholder).processClaim(policyId)
       ).to.be.revertedWith("Cannot claim before departure time");
       
       // Check policy is still ACTIVE
@@ -768,6 +774,153 @@ describe("Policy", function () {
       
       expect(hasInsured1).to.be.true;
       expect(hasInsured2).to.be.true;
+    });
+  });
+
+  describe("Single Flight Policy Prevention", function () {
+    it("Should revert when trying to create a second policy for the same flight ID", async function () {
+      const [owner, policyholder, oracle, user2] = await hre.ethers.getSigners();
+      
+      // Deploy MockPYUSD token
+      const MockPYUSD = await hre.ethers.getContractFactory("MockPYUSD");
+      const mockPYUSD = await MockPYUSD.deploy();
+      
+      // Deploy PolicyNFT contract first with owner as owner
+      const PolicyNFT = await hre.ethers.getContractFactory("PolicyNFT");
+      const policyNFT = await PolicyNFT.deploy(owner.address);
+      await policyNFT.waitForDeployment();
+      const policyNFTAddress = await policyNFT.getAddress();
+      
+      // Deploy Policy contract with MockPYUSD address
+      const Policy = await hre.ethers.getContractFactory("Policy");
+      const policy2 = await Policy.deploy(await mockPYUSD.getAddress(), policyNFTAddress);
+
+      // Transfer PolicyNFT ownership to Policy contract
+      await policyNFT.connect(owner).transferOwnership(await policy2.getAddress());
+
+      // Set oracle address
+      await policy2.connect(owner).setOracleAddress(oracle.address);
+      
+      // Fund contract with PYUSD for payouts
+      const contractFundAmount = hre.ethers.parseUnits("10000", 6);
+      await mockPYUSD.transfer(await policy2.getAddress(), contractFundAmount);
+      
+      // Fund policyholder with PYUSD (using 6 decimals)
+      const fundAmount = hre.ethers.parseUnits("1000", 6);
+      await mockPYUSD.transfer(policyholder.address, fundAmount);
+      
+      // Approve PYUSD spending
+      await mockPYUSD.connect(policyholder).approve(await policy2.getAddress(), fundAmount);
+      
+      const flightId = "FL123";
+      const departureTimestamp = Math.floor(Date.now() / 1000) + 172800; // 48 hours from now
+      const payoutAmount = hre.ethers.parseUnits("100", 6); // 6 decimals
+      const premiumAmount = payoutAmount / 10n;
+      
+      // First user creates a policy for FL123
+      try {
+        await policy2.connect(policyholder).createPolicy(
+          flightId,
+          departureTimestamp,
+          payoutAmount,
+          { value: premiumAmount }
+        );
+        console.log("First policy created successfully");
+      } catch (error) {
+        console.log("First policy creation failed:", error.message);
+        throw error;
+      }
+      
+      // Check that flightHasPolicy is set to true
+      const flightHasPolicy = await policy2.flightHasPolicy(flightId);
+      expect(flightHasPolicy).to.be.true;
+      
+      // Fund user2 with PYUSD (using 6 decimals)
+      await mockPYUSD.transfer(user2.address, fundAmount);
+      await mockPYUSD.connect(user2).approve(await policy2.getAddress(), fundAmount);
+      
+      // Second user tries to create another policy for the same flight ID
+      await expect(
+        policy2.connect(user2).createPolicy(
+          flightId,
+          departureTimestamp + 3600, // Different departure time
+          payoutAmount,
+          { value: premiumAmount }
+        )
+      ).to.be.revertedWith("FlySure: This flight already has a policy");
+    });
+
+    it("Should allow different flight IDs to have policies", async function () {
+      const [owner, policyholder, oracle] = await hre.ethers.getSigners();
+      
+      // Deploy MockPYUSD token
+      const MockPYUSD = await hre.ethers.getContractFactory("MockPYUSD");
+      const mockPYUSD = await MockPYUSD.deploy();
+      
+      // Deploy PolicyNFT contract first with owner as owner
+      const PolicyNFT = await hre.ethers.getContractFactory("PolicyNFT");
+      const policyNFT = await PolicyNFT.deploy(owner.address);
+      await policyNFT.waitForDeployment();
+      const policyNFTAddress = await policyNFT.getAddress();
+      
+      // Deploy Policy contract with MockPYUSD address
+      const Policy = await hre.ethers.getContractFactory("Policy");
+      const policy = await Policy.deploy(await mockPYUSD.getAddress(), policyNFTAddress);
+
+      // Transfer PolicyNFT ownership to Policy contract
+      await policyNFT.connect(owner).transferOwnership(await policy.getAddress());
+
+      // Set oracle address
+      await policy.connect(owner).setOracleAddress(oracle.address);
+      
+      // Fund contract with PYUSD for payouts
+      const contractFundAmount = hre.ethers.parseUnits("10000", 6);
+      await mockPYUSD.transfer(await policy.getAddress(), contractFundAmount);
+      
+      // Fund policyholder with PYUSD (using 6 decimals)
+      const fundAmount = hre.ethers.parseUnits("1000", 6);
+      await mockPYUSD.transfer(policyholder.address, fundAmount);
+      
+      // Approve PYUSD spending
+      await mockPYUSD.connect(policyholder).approve(await policy.getAddress(), fundAmount);
+
+      const flightId1 = "FL123";
+      const flightId2 = "FL456";
+      const departureTimestamp = Math.floor(Date.now() / 1000) + 172800;
+      const payoutAmount = hre.ethers.parseUnits("100", 6); // 6 decimals
+      const premiumAmount = payoutAmount / 10n;
+      
+      // Create policy for FL123
+      await expect(
+        policy.connect(policyholder).createPolicy(
+          flightId1,
+          departureTimestamp,
+          payoutAmount,
+          { value: premiumAmount }
+        )
+      ).to.not.be.reverted;
+      
+      // Check that FL123 has a policy
+      const flight1HasPolicy = await policy.flightHasPolicy(flightId1);
+      expect(flight1HasPolicy).to.be.true;
+      
+      // Check that FL456 doesn't have a policy yet
+      const flight2HasPolicy = await policy.flightHasPolicy(flightId2);
+      expect(flight2HasPolicy).to.be.false;
+      
+      // Create policy for FL456 (should be allowed)
+      await expect(
+        policy.connect(policyholder).createPolicy(
+          flightId2,
+          departureTimestamp,
+          payoutAmount,
+          { value: premiumAmount }
+        )
+      ).to.not.be.reverted;
+      
+      // Check that FL456 now has a policy
+      const flight2HasPolicyAfter = await policy.flightHasPolicy(flightId2);
+      expect(flight2HasPolicyAfter).to.be.true;
     });
   });
 });
