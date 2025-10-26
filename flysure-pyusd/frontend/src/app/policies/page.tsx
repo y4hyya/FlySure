@@ -3,60 +3,116 @@
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { MyPolicies } from '@/components/MyPolicies';
+import { motion } from 'framer-motion';
+import { BackgroundBeams } from '@/components/ui/background-beams';
+import { BackgroundGradient } from '@/components/ui/background-gradient';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Shield, FileText, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PoliciesPage() {
   const { isConnected } = useAccount();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center text-indigo-600 hover:text-indigo-800 transition-colors mb-6"
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      <BackgroundBeams className="absolute inset-0" />
+      
+      {/* Header */}
+      <div className="relative z-10 pt-20 pb-8 px-4">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="flex items-center gap-4 mb-8"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Home
-          </Link>
-        </div>
+            <BackgroundGradient className="rounded-full">
+              <Link href="/">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="bg-transparent border-0 text-white hover:bg-white/10"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Home
+                </Button>
+              </Link>
+            </BackgroundGradient>
+          </motion.div>
 
-        {isConnected ? (
-          <MyPolicies />
-        ) : (
-          <div className="bg-white rounded-lg shadow-lg p-12 max-w-2xl mx-auto text-center">
-            <div className="mb-6">
-              <svg className="w-20 h-20 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-              Connect Your Wallet
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Please connect your wallet to view your insurance policies
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="text-center mb-12"
+          >
+            <h1 className="text-5xl md:text-6xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400">
+              My Policies
+            </h1>
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+              Manage and track your flight insurance policies
             </p>
-            <div className="flex justify-center">
-              <ConnectButton />
-            </div>
-          </div>
-        )}
-
-        <div className="mt-12 text-center">
-          <div className="inline-flex items-center gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-              <span>Sepolia Testnet</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>💵</span>
-              <span>Powered by PYUSD</span>
-            </div>
-          </div>
+          </motion.div>
         </div>
-      </main>
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 px-4 pb-20">
+        <div className="max-w-6xl mx-auto">
+          {isConnected ? (
+            <MyPolicies />
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <Card className="bg-gray-900/50 border-gray-800 max-w-2xl mx-auto">
+                <CardHeader className="text-center pb-8">
+                  <div className="flex justify-center mb-6">
+                    <BackgroundGradient className="rounded-full">
+                      <div className="p-4 bg-transparent">
+                        <Shield className="h-16 w-16 text-white" />
+                      </div>
+                    </BackgroundGradient>
+                  </div>
+                  <CardTitle className="text-2xl text-white mb-2">
+                    Connect Your Wallet
+                  </CardTitle>
+                  <CardDescription className="text-gray-300 text-lg">
+                    Please connect your wallet to view your insurance policies
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="text-center">
+                  <BackgroundGradient className="rounded-full">
+                    <ConnectButton />
+                  </BackgroundGradient>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Footer Info */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="mt-16 text-center"
+          >
+            <div className="inline-flex items-center gap-8 text-sm text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Sepolia Testnet</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>💵</span>
+                <span>Powered by PYUSD</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
     </div>
   );
 }
