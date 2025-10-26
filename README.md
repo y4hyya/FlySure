@@ -1,22 +1,26 @@
-# 🛫 FlySure - Parametric Flight Insurance DApp
+# 🛫 FlySure - NFT-Based Parametric Flight Insurance DApp
 
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.19-blue.svg)](https://soliditylang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.0.0-black.svg)](https://nextjs.org/)
 [![Hardhat](https://img.shields.io/badge/Hardhat-2.22.0-yellow.svg)](https://hardhat.org/)
 [![Sepolia](https://img.shields.io/badge/Network-Sepolia-purple.svg)](https://sepolia.etherscan.io/)
+[![ERC721](https://img.shields.io/badge/NFT-ERC721-green.svg)](https://eips.ethereum.org/EIPS/eip-721)
 
-**FlySure** is a decentralized parametric flight insurance application built on Ethereum Sepolia testnet. It provides automated flight delay and cancellation insurance using PYUSD stablecoin, with oracle-driven parametric triggers for instant payouts.
+**FlySure** is a revolutionary decentralized parametric flight insurance application built on Ethereum Sepolia testnet. It leverages NFT technology to represent insurance policies as unique digital assets, providing automated flight delay and cancellation insurance using PYUSD stablecoin with oracle-driven parametric triggers for instant payouts.
 
 ## 🌟 Features
 
 ### 🎯 Core Functionality
+- **NFT-Based Policies**: Each insurance policy is represented as a unique ERC721 NFT
 - **Parametric Insurance**: Automated payouts based on flight status data
 - **Oracle Integration**: Real-time flight status updates from trusted sources
 - **PYUSD Integration**: Uses Paxos's official PYUSD stablecoin on Sepolia
-- **Smart Contract Automation**: Self-executing insurance policies
+- **Smart Contract Automation**: Self-executing insurance policies with NFT burning
 - **Real-time Claims**: Instant payout processing based on oracle data
+- **Flight Policy Prevention**: One policy per flight ID to prevent double-booking
 
 ### 🛠️ Technical Features
+- **ERC721 NFT Contract**: PolicyNFT.sol for NFT-based policy representation
 - **Solidity Smart Contracts**: Secure and gas-optimized insurance logic
 - **Next.js Frontend**: Modern React-based user interface
 - **Wagmi Integration**: Seamless Web3 wallet connectivity
@@ -30,20 +34,30 @@
 - **Real-time Updates**: Live transaction status and policy updates
 - **Admin Panel**: Comprehensive management interface for oracles and owners
 - **Mobile Responsive**: Optimized for all device sizes
+- **NFT Visualization**: Beautiful policy NFT cards with status indicators
 
 ## 🏗️ Architecture
 
 ### Smart Contract Layer
 ```
-Policy.sol
+Policy.sol (Main Contract)
 ├── PolicyInfo struct (policyholder, flightId, amounts, timestamps, status)
 ├── FlightStatus enum (ON_TIME, DELAYED, CANCELLED)
 ├── PolicyStatus enum (ACTIVE, PAID, EXPIRED)
-├── createPolicy() - Create new insurance policies
+├── createPolicy() - Creates NFT and stores policy data
 ├── updateFlightStatus() - Oracle updates flight data
-├── claimPayout() - Policyholder claims based on oracle data
-├── expirePolicy() - Expire on-time policies
+├── processClaim() - NFT-based claim processing with burning
+├── getPolicyDetails() - Fetches data from NFT contract
 └── Access control (owner, oracle, policyholder)
+
+PolicyNFT.sol (NFT Contract)
+├── PolicyDetails struct (flightNumber, amounts, timestamps, status)
+├── PolicyStatus enum (Active, Claimable, PaidOut, Expired)
+├── mintPolicy() - Mints new policy NFT
+├── updatePolicyStatus() - Updates NFT status
+├── burnPolicy() - Burns NFT after claim
+├── getPolicyStatus() - Returns current NFT status
+└── ERC721URIStorage integration
 ```
 
 ### Frontend Layer
@@ -51,12 +65,12 @@ Policy.sol
 Next.js Application
 ├── Pages
 │   ├── / - Homepage with modern UI
-│   ├── /create - Policy creation form
-│   ├── /policies - User's policy dashboard
+│   ├── /create - Policy creation form with NFT preview
+│   ├── /policies - User's NFT policy dashboard
 │   └── /admin - Admin panel for oracles
 ├── Components
 │   ├── CreatePolicyForm - Policy creation with validation
-│   ├── MyPolicies - Policy management and claims
+│   ├── MyPolicies - NFT policy management and claims
 │   ├── Navigation - Floating navigation bar
 │   └── UI Components - shadcn/ui integration
 └── Lib
@@ -105,18 +119,23 @@ PRIVATE_KEY=your_private_key
 npx hardhat run scripts/deploy.ts --network sepolia
 ```
 
-5. **Fund the contract**
+5. **Set oracle address**
 ```bash
-npx hardhat run scripts/fundSepolia.ts --network sepolia
+npx hardhat run scripts/setOracle.ts --network sepolia
 ```
 
-6. **Start the frontend**
+6. **Fund the contract**
+```bash
+npx hardhat run scripts/fundContract.ts --network sepolia
+```
+
+7. **Start the frontend**
 ```bash
 cd frontend
 npm run dev
 ```
 
-7. **Access the application**
+8. **Access the application**
 - Open `http://localhost:3000`
 - Connect your MetaMask wallet to Sepolia testnet
 - Get PYUSD testnet tokens from [Paxos Faucet](https://faucet.paxos.com/)
@@ -128,30 +147,30 @@ npm run dev
 #### Creating a Policy
 1. Navigate to `/create`
 2. Enter flight details:
-   - **Flight Code**: e.g., "TK1234"
+   - **Flight Code**: e.g., "TK1234" (must be unique)
    - **Premium Amount**: Amount to pay (in PYUSD)
-   - **Delay Threshold**: Minutes of delay to trigger payout
+   - **Payout Amount**: Amount to receive if delayed/cancelled
    - **Departure Time**: Flight departure timestamp
 3. Click "Create Policy"
 4. Approve PYUSD spending
 5. Confirm policy creation transaction
+6. **NFT Minted**: Your policy is now represented as a unique NFT
 
 #### Managing Policies
 1. Navigate to `/policies`
-2. View all your active policies
-3. **Process Claim**: Available when flight is delayed/cancelled
+2. View all your NFT policies
+3. **Process Claim**: Available when flight is delayed/cancelled (NFT gets burned)
 4. **Expire Policy**: Available when flight is on time
 
 ### For Oracles
 
 #### Updating Flight Status
 1. Navigate to `/admin` (requires oracle access)
-2. Go to "Flight Status Update" section
-3. Enter policy details:
-   - **Policy ID**: Target policy ID
+2. Go to "Oracle Payout Trigger" section
+3. Enter flight details:
+   - **Flight ID**: Target flight number
    - **Flight Status**: ON_TIME, DELAYED, or CANCELLED
-   - **Actual Delay**: Delay in minutes (for DELAYED status)
-4. Click "Update Flight Status"
+4. Click "Trigger Payout"
 5. Confirm transaction
 
 ### For Contract Owners
@@ -159,8 +178,8 @@ npm run dev
 #### Admin Functions
 1. Navigate to `/admin` (requires owner access)
 2. **Set Oracle Address**: Configure trusted oracle
-3. **Create Policies**: Direct policy creation
-4. **Monitor Contract**: View contract status and balances
+3. **Monitor Contract**: View contract status and balances
+4. **Manage Policies**: View all policies and their status
 
 ## 🔧 Development
 
@@ -169,7 +188,8 @@ npm run dev
 flysure-pyusd/
 ├── contracts/
 │   ├── Policy.sol          # Main insurance contract
-│   └── MockPYUSD.sol      # Test token contract
+│   ├── PolicyNFT.sol       # NFT contract for policies
+│   └── MockPYUSD.sol       # Test token contract
 ├── frontend/
 │   ├── src/
 │   │   ├── app/           # Next.js app router pages
@@ -179,11 +199,13 @@ flysure-pyusd/
 │   └── package.json       # Frontend dependencies
 ├── scripts/
 │   ├── deploy.ts          # Contract deployment
-│   ├── fundSepolia.ts     # Contract funding
-│   ├── checkOracle.ts     # Oracle management
-│   └── testContract.ts    # Contract testing
+│   ├── fundContract.ts    # Contract funding
+│   ├── setOracle.ts       # Oracle configuration
+│   ├── checkContractStatus.ts # Contract monitoring
+│   └── checkFlightPolicy.ts   # Flight policy checker
 ├── test/
-│   └── Policy.test.ts     # Comprehensive test suite
+│   ├── Policy.test.ts     # Main contract tests
+│   └── PolicyNFT.test.ts  # NFT contract tests
 └── hardhat.config.ts      # Hardhat configuration
 ```
 
@@ -194,6 +216,7 @@ npx hardhat test
 
 # Run specific test file
 npx hardhat test test/Policy.test.ts
+npx hardhat test test/PolicyNFT.test.ts
 
 # Run tests with gas reporting
 REPORT_GAS=true npx hardhat test
@@ -201,8 +224,11 @@ REPORT_GAS=true npx hardhat test
 
 ### Contract Verification
 ```bash
-# Verify on Etherscan
-npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
+# Verify Policy contract on Etherscan
+npx hardhat verify --network sepolia <POLICY_CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS> <POLICY_NFT_ADDRESS>
+
+# Verify PolicyNFT contract on Etherscan
+npx hardhat verify --network sepolia <POLICY_NFT_ADDRESS>
 ```
 
 ## 🌐 Network Configuration
@@ -211,7 +237,8 @@ npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
 - **Chain ID**: 11155111
 - **RPC URL**: `https://sepolia.drpc.org`
 - **PYUSD Token**: `0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9`
-- **Policy Contract**: `0x48445399E3e69f6700d64EDB00fb9DC5dD6C39c1`
+- **Policy Contract**: `0x85B4d392E4212a4597dF83A3bD8E23e723c38778`
+- **PolicyNFT Contract**: `0x11f45E3bd6Be53D29d065c8D37d5646de5Df454C`
 
 ### Getting Testnet Tokens
 - **Sepolia ETH**: [Sepolia Faucet](https://sepoliafaucet.com/)
@@ -220,48 +247,47 @@ npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
 ## 🔒 Security Features
 
 ### Smart Contract Security
+- **NFT Ownership Verification**: Only NFT owners can claim payouts
 - **Access Control**: Owner, oracle, and policyholder role separation
 - **Checks-Effects-Interactions**: Prevents re-entrancy attacks
 - **Input Validation**: Comprehensive parameter validation
 - **Safe Math**: Overflow/underflow protection
-- **Emergency Functions**: Owner can pause critical functions
+- **NFT Burning**: Prevents double claims by burning NFTs after payout
 
 ### Frontend Security
 - **Input Sanitization**: All user inputs are validated
 - **Transaction Confirmation**: Multi-step transaction approval
 - **Error Handling**: Comprehensive error catching and user feedback
 - **Wallet Integration**: Secure Web3 wallet connectivity
+- **Real-time Validation**: Flight uniqueness checking
 
 ## 📊 Contract Functions
 
 ### Public Functions
 ```solidity
-// Create a new insurance policy
+// Create a new insurance policy (mints NFT)
 function createPolicy(
-    string memory _flightId,
-    uint256 _premiumAmount,
-    uint256 _payoutAmount,
-    uint256 _delayThreshold,
-    uint256 _departureTimestamp
+    string memory _flightNumber,
+    uint256 _departureTimestamp,
+    uint256 _payoutAmount
 ) public returns (uint256)
 
-// Claim payout based on oracle data
-function claimPayout(uint256 _policyId) public
+// Process claim (burns NFT and transfers payout)
+function processClaim(uint256 _policyId) public
 
-// Expire policy if flight was on time
-function expirePolicy(uint256 _policyId) public
-
-// Get policy details
+// Get policy details from NFT contract
 function getPolicyDetails(uint256 _policyId) public view returns (PolicyInfo memory)
+
+// Get user's policy IDs
+function getPolicyIdsForUser(address _user) public view returns (uint256[] memory)
 ```
 
 ### Oracle Functions
 ```solidity
 // Update flight status (oracle only)
 function updateFlightStatus(
-    uint256 _policyId,
-    FlightStatus _flightStatus,
-    uint256 _actualDelayMinutes
+    string memory _flightNumber,
+    uint8 _newStatus
 ) public onlyOracle
 ```
 
@@ -269,37 +295,63 @@ function updateFlightStatus(
 ```solidity
 // Set oracle address
 function setOracleAddress(address _oracleAddress) public onlyOwner
+```
 
-// Emergency functions
-function pause() public onlyOwner
-function unpause() public onlyOwner
+### NFT Contract Functions
+```solidity
+// Mint new policy NFT (owner only)
+function mintPolicy(
+    address _policyholder,
+    string memory _flightNumber,
+    uint256 _premium,
+    uint256 _payout,
+    uint256 _departureTime,
+    uint256 _policyId
+) external onlyOwner
+
+// Update NFT status (owner only)
+function updatePolicyStatus(uint256 _policyId, PolicyStatus _newStatus) external onlyOwner
+
+// Burn NFT (owner only)
+function burnPolicy(uint256 _policyId) external onlyOwner
+
+// Get NFT status
+function getPolicyStatus(uint256 _policyId) public view returns (PolicyStatus)
 ```
 
 ## 🧪 Testing Scenarios
 
 ### Policy Creation Tests
-- ✅ Valid policy creation
+- ✅ Valid policy creation with NFT minting
 - ✅ Invalid parameters rejection
 - ✅ PYUSD transfer validation
+- ✅ Flight uniqueness validation
 - ✅ Access control verification
+
+### NFT Integration Tests
+- ✅ NFT minting and burning
+- ✅ Status updates
+- ✅ Ownership verification
+- ✅ Metadata handling
 
 ### Oracle Integration Tests
 - ✅ Oracle-only access control
 - ✅ Flight status updates
-- ✅ Delay threshold validation
 - ✅ Event emission verification
+- ✅ Multiple policy updates
 
 ### Claim Process Tests
-- ✅ Delayed flight payout
+- ✅ Delayed flight payout with NFT burning
 - ✅ Cancelled flight payout
 - ✅ On-time flight expiration
-- ✅ Insufficient delay rejection
+- ✅ Double claim prevention
 
 ### Edge Cases
 - ✅ Past departure time validation
 - ✅ Zero amount rejection
 - ✅ Non-existent policy handling
 - ✅ Re-entrancy protection
+- ✅ Flight policy prevention
 
 ## 🚀 Deployment
 
@@ -320,11 +372,15 @@ cd frontend && npm run dev
 # Deploy to Sepolia
 npx hardhat run scripts/deploy.ts --network sepolia
 
-# Fund contract
-npx hardhat run scripts/fundSepolia.ts --network sepolia
+# Set oracle address
+npx hardhat run scripts/setOracle.ts --network sepolia
 
-# Verify contract
-npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
+# Fund contract
+npx hardhat run scripts/fundContract.ts --network sepolia
+
+# Verify contracts
+npx hardhat verify --network sepolia <POLICY_CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS> <POLICY_NFT_ADDRESS>
+npx hardhat verify --network sepolia <POLICY_NFT_ADDRESS>
 ```
 
 ### Production Deployment
@@ -337,6 +393,7 @@ npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
 ## 📈 Gas Optimization
 
 ### Contract Optimizations
+- **NFT Burning**: Efficient cleanup after claims
 - **Packed Structs**: Efficient storage layout
 - **Batch Operations**: Multiple operations in single transaction
 - **Event Usage**: Minimal storage writes
@@ -347,15 +404,17 @@ npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <PYUSD_TOKEN_ADDRESS>
 - **Gas Estimation**: Dynamic gas limit calculation
 - **Error Recovery**: Graceful failure handling
 - **Caching**: Reduce redundant contract calls
+- **Real-time Validation**: Prevent unnecessary transactions
 
 ## 🔍 Monitoring & Analytics
 
 ### Contract Events
 ```solidity
 event PolicyCreated(uint256 indexed policyId, address indexed policyHolder, string flightId);
+event PolicyNFTCreated(uint256 indexed policyId, address indexed policyHolder, string flightId);
 event FlightStatusUpdated(uint256 indexed policyId, string flightId, FlightStatus status, uint256 delayMinutes);
-event PolicyPaidOut(uint256 indexed policyId, address indexed policyHolder, uint256 amount);
-event PolicyExpired(uint256 indexed policyId, address indexed policyHolder);
+event ClaimPaid(uint256 indexed policyId, address indexed claimant, uint256 payoutAmount);
+event PolicyStatusUpdated(uint256 indexed policyId, PolicyStatus oldStatus, PolicyStatus newStatus);
 ```
 
 ### Frontend Monitoring
@@ -363,6 +422,7 @@ event PolicyExpired(uint256 indexed policyId, address indexed policyHolder);
 - Error logging and reporting
 - User interaction analytics
 - Performance metrics
+- NFT creation and burning events
 
 ## 🤝 Contributing
 
@@ -379,6 +439,7 @@ event PolicyExpired(uint256 indexed policyId, address indexed policyHolder);
 - **TypeScript**: Use strict type checking
 - **React**: Follow React best practices
 - **Testing**: Maintain >90% test coverage
+- **NFT Standards**: Follow ERC721 best practices
 
 ## 📄 License
 
@@ -391,11 +452,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Next.js**: For frontend framework
 - **shadcn/ui**: For UI components
 - **Wagmi**: For Web3 integration
+- **OpenZeppelin**: For ERC721 NFT implementation
 
 ## 📞 Support
 
 ### Documentation
 - [Smart Contract Documentation](contracts/Policy.sol)
+- [NFT Contract Documentation](contracts/PolicyNFT.sol)
 - [API Reference](docs/api.md)
 - [Deployment Guide](docs/deployment.md)
 
@@ -412,3 +475,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Built with ❤️ for the decentralized future of insurance**
+
+*Revolutionizing flight insurance through NFT technology and parametric triggers*
