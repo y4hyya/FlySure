@@ -11,8 +11,8 @@ import hre from "hardhat";
 
 async function main() {
   // Configuration
-  const POLICY_CONTRACT_ADDRESS = "YOUR_DEPLOYED_POLICY_CONTRACT_ADDRESS";
-  const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9"; // Sepolia
+  const POLICY_CONTRACT_ADDRESS = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0";
+  const PYUSD_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // Mock PYUSD
   
   // Get signer
   const [signer] = await hre.ethers.getSigners();
