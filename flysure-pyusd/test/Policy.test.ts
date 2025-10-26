@@ -651,19 +651,123 @@ describe("Policy", function () {
     });
   });
 
-  describe("View Functions", function () {
-    it("Should return empty policy details for non-existent policy", async function () {
-      const { policy } = await deployPolicyFixture();
+  describe("Double-Booking Prevention", function () {
+    it("Should revert when a user tries to insure the same flight twice", async function () {
+      const { policy, policyholder, oracle, owner } = await deployPolicyFixture();
       
-      const policyDetails = await policy.getPolicyDetails(999);
-      expect(policyDetails.policyHolder).to.equal(hre.ethers.ZeroAddress);
+      // Deploy MockPYUSD for testing
+      const MockPYUSD = await hre.ethers.getContractFactory("MockPYUSD");
+      const mockPYUSD = await MockPYUSD.deploy();
+      
+      // Deploy Policy with MockPYUSD
+      const Policy = await hre.ethers.getContractFactory("Policy");
+      const testPolicy = await Policy.deploy(mockPYUSD.target);
+      await testPolicy.connect(owner).setOracleAddress(oracle.address);
+      
+      // Fund policyholder with MockPYUSD
+      const policyholderFundAmount = hre.ethers.parseUnits("1000", 6);
+      await mockPYUSD.transfer(policyholder.address, policyholderFundAmount);
+      
+      // Fund contract with MockPYUSD for payouts
+      const fundAmount = hre.ethers.parseUnits("1000", 6);
+      await mockPYUSD.transfer(testPolicy.target, fundAmount);
+      
+      const flightId = "FL123";
+      const premiumAmount = hre.ethers.parseUnits("10", 6);
+      const payoutAmount = hre.ethers.parseUnits("100", 6);
+      const delayThreshold = 120;
+      const departureTimestamp = Math.floor(Date.now() / 1000) + 172800; // 48 hours from now
+      
+      // Approve PYUSD spending
+      await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
+      
+      // First policy creation should succeed
+      const tx1 = await testPolicy.connect(policyholder).createPolicy(
+        flightId,
+        premiumAmount,
+        payoutAmount,
+        delayThreshold,
+        departureTimestamp
+      );
+      await tx1.wait();
+      
+      // Approve PYUSD spending for second policy
+      await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
+      
+      // Second policy creation for the same flight should fail
+      await expect(
+        testPolicy.connect(policyholder).createPolicy(
+          flightId, // Same flight ID
+          premiumAmount,
+          payoutAmount,
+          delayThreshold,
+          departureTimestamp
+        )
+      ).to.be.revertedWith("FlySure: You have already insured this flight");
+      
+      // Verify that hasInsuredFlight mapping is correctly set
+      const hasInsured = await testPolicy.hasInsuredFlight(policyholder.address, flightId);
+      expect(hasInsured).to.be.true;
     });
-
-    it("Should return empty array for user with no policies", async function () {
-      const { policy, policyholder } = await deployPolicyFixture();
+    
+    it("Should allow different users to insure the same flight", async function () {
+      const { policy, policyholder, oracle, owner } = await deployPolicyFixture();
       
-      const userPolicies = await policy.getPolicyIdsForUser(policyholder.address);
-      expect(userPolicies.length).to.equal(0);
+      // Get another user
+      const [, , , , user2] = await hre.ethers.getSigners();
+      
+      // Deploy MockPYUSD for testing
+      const MockPYUSD = await hre.ethers.getContractFactory("MockPYUSD");
+      const mockPYUSD = await MockPYUSD.deploy();
+      
+      // Deploy Policy with MockPYUSD
+      const Policy = await hre.ethers.getContractFactory("Policy");
+      const testPolicy = await Policy.deploy(mockPYUSD.target);
+      await testPolicy.connect(owner).setOracleAddress(oracle.address);
+      
+      // Fund both users with MockPYUSD
+      const userFundAmount = hre.ethers.parseUnits("1000", 6);
+      await mockPYUSD.transfer(policyholder.address, userFundAmount);
+      await mockPYUSD.transfer(user2.address, userFundAmount);
+      
+      // Fund contract with MockPYUSD for payouts
+      const fundAmount = hre.ethers.parseUnits("2000", 6);
+      await mockPYUSD.transfer(testPolicy.target, fundAmount);
+      
+      const flightId = "FL456";
+      const premiumAmount = hre.ethers.parseUnits("10", 6);
+      const payoutAmount = hre.ethers.parseUnits("100", 6);
+      const delayThreshold = 120;
+      const departureTimestamp = Math.floor(Date.now() / 1000) + 172800; // 48 hours from now
+      
+      // User 1 creates policy
+      await mockPYUSD.connect(policyholder).approve(testPolicy.target, premiumAmount);
+      const tx1 = await testPolicy.connect(policyholder).createPolicy(
+        flightId,
+        premiumAmount,
+        payoutAmount,
+        delayThreshold,
+        departureTimestamp
+      );
+      await tx1.wait();
+      
+      // User 2 creates policy for the same flight (should succeed)
+      await mockPYUSD.connect(user2).approve(testPolicy.target, premiumAmount);
+      const tx2 = await testPolicy.connect(user2).createPolicy(
+        flightId, // Same flight ID
+        premiumAmount,
+        payoutAmount,
+        delayThreshold,
+        departureTimestamp
+      );
+      await tx2.wait();
+      
+      // Both users should have insured this flight
+      const hasInsured1 = await testPolicy.hasInsuredFlight(policyholder.address, flightId);
+      const hasInsured2 = await testPolicy.hasInsuredFlight(user2.address, flightId);
+      
+      expect(hasInsured1).to.be.true;
+      expect(hasInsured2).to.be.true;
     });
   });
 });

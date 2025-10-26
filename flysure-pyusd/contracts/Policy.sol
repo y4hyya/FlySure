@@ -54,6 +54,9 @@ contract Policy is Ownable {
     // Mapping to track user's policy IDs
     mapping(address => uint256[]) private userPolicies;
     
+    // Mapping to track which address has insured which flight (prevents double-booking)
+    mapping(address => mapping(string => bool)) public hasInsuredFlight;
+    
     // Oracle address for flight data verification
     address public oracleAddress;
     
@@ -141,6 +144,12 @@ contract Policy is Ownable {
         require(oracleAddress != address(0), "Oracle address not set");
         require(_payoutAmount <= _premiumAmount * 10, "Payout cannot exceed 10x premium");
         
+        // Prevent double-booking: check if user has already insured this flight
+        require(
+            hasInsuredFlight[msg.sender][_flightId] == false,
+            "FlySure: You have already insured this flight"
+        );
+        
         // Check if contract has sufficient PYUSD for payout
         require(pyusdToken.balanceOf(address(this)) >= _payoutAmount, "Insufficient contract balance for payout");
         
@@ -169,6 +178,9 @@ contract Policy is Ownable {
         
         // Track policy ID for user
         userPolicies[msg.sender].push(newPolicyId);
+        
+        // Mark this flight as insured by this user (prevent double-booking)
+        hasInsuredFlight[msg.sender][_flightId] = true;
         
         // Emit event
         emit PolicyCreated(
