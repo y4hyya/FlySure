@@ -3,6 +3,8 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export const FloatingNav = ({
   navItems,
@@ -33,6 +35,18 @@ export const FloatingNav = ({
         className
       )}
     >
+      {/* Logo */}
+      <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+        <Image
+          src="/flysure-logo.png"
+          alt="FlySure Logo"
+          width={32}
+          height={32}
+          className="mr-2 rounded"
+        />
+        <span className="hidden sm:block text-sm font-semibold text-blue-600">FlySure</span>
+      </Link>
+      
       {navItems.map((navItem: any, idx: number) => (
         <a
           key={`link-${idx}`}

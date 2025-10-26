@@ -1,0 +1,32 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield background with gradient -->
+  <defs>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#357ABD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E5B8A;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield shape with proper rounded corners -->
+  <path d="M16 2 C20 2, 23 4, 25 7 C27 10, 27 14, 25 17 C23 20, 20 22, 16 22 C12 22, 9 20, 7 17 C5 14, 5 10, 7 7 C9 4, 12 2, 16 2 Z" 
+        fill="url(#shieldGradient)" 
+        stroke="none"/>
+  
+  <!-- Airplane with proper design -->
+  <g transform="translate(16, 16)">
+    <!-- Main fuselage (horizontal) -->
+    <path d="M-5 -1 L5 -1 L4 0 L5 1 L-5 1 L-4 0 Z" fill="white" stroke="white" stroke-width="1"/>
+    
+    <!-- Wings (swept back) -->
+    <path d="M-3 -3 L3 -3 L2 -1 L-2 -1 Z" fill="white" stroke="white" stroke-width="1"/>
+    <path d="M-3 3 L3 3 L2 1 L-2 1 Z" fill="white" stroke="white" stroke-width="1"/>
+    
+    <!-- Tail fin (angled) -->
+    <path d="M4 0 L7 -2 L7 2 Z" fill="white" stroke="white" stroke-width="1"/>
+    
+    <!-- Speed lines (contrails) -->
+    <line x1="-6" y1="-1" x2="-9" y2="-2" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+    <line x1="-6" y1="1" x2="-8" y2="1" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

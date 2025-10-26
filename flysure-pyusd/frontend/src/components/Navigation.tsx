@@ -4,6 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useReadContract } from 'wagmi';
 import { POLICY_ABI, POLICY_CONTRACT_ADDRESS } from '@/lib/abi';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export function Navigation() {
@@ -25,8 +26,17 @@ export function Navigation() {
     <nav className="sticky top-0 z-50 w-full bg-white shadow-md">
       <div className="flex justify-between items-center max-w-7xl mx-auto px-4 py-3">
         <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-          <h1 className="text-2xl font-bold text-blue-600">✈️ FlySure</h1>
-          <span className="ml-2 text-sm text-gray-500">PYUSD Insurance</span>
+          <Image
+            src="/flysure-logo.png"
+            alt="FlySure Logo"
+            width={40}
+            height={40}
+            className="mr-3 rounded"
+          />
+          <div>
+            <h1 className="text-2xl font-bold text-blue-600">FlySure</h1>
+            <span className="text-sm text-gray-500">PYUSD Insurance</span>
+          </div>
         </Link>
         
         <div className="flex items-center gap-4">

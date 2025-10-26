@@ -1,5 +1,6 @@
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +73,22 @@ export default function Home() {
           transition={{ duration: 0.8 }}
           className="relative z-10 max-w-4xl mx-auto"
         >
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.1 }}
+            className="flex justify-center mb-8"
+          >
+            <Image
+              src="/flysure-logo.png"
+              alt="FlySure Logo"
+              width={120}
+              height={120}
+              className="drop-shadow-2xl rounded-lg"
+            />
+          </motion.div>
+          
           <motion.h1 
             className="text-6xl md:text-8xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400"
             initial={{ opacity: 0, scale: 0.5 }}
