@@ -2,9 +2,9 @@ import PolicyABIJson from './PolicyABI.json';
 
 export const POLICY_ABI = PolicyABIJson;
 
-// Contract addresses
-export const POLICY_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
-export const PYUSD_TOKEN_ADDRESS = '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9' as const;
+// Contract addresses (Sepolia testnet)
+export const POLICY_CONTRACT_ADDRESS = '0x48445399E3e69f6700d64EDB00fb9DC5dD6C39c1' as const;
+export const PYUSD_TOKEN_ADDRESS = '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9' as const; // Real PYUSD on Sepolia
 
 // PYUSD ERC20 ABI (minimal for approve and balanceOf)
 export const ERC20_ABI = [
